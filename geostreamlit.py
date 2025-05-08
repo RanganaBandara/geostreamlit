@@ -7,7 +7,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 class DistributionGenerator:
-    def __init__(self):
+    def _init_(self):
         st.set_page_config(page_title="Distribution Generator", layout="wide")
         
         self.dist_functions = {
@@ -95,6 +95,9 @@ class DistributionGenerator:
             st.subheader("Sample Properties")
             sample_size = st.number_input("Sample Size", value=1000, min_value=1)
             diameter = st.number_input("Pile Diameter (m)", value=1.0)
+            height = st.number_input("Height of Rock Socket (m)", value=1.0, min_value=0.0)
+            
+
             
             # Coordinates Range
             col1, col2 = st.columns(2)
@@ -112,7 +115,7 @@ class DistributionGenerator:
             if submitted:
                 self._generate_distribution(
                     st.session_state.dist_type, params, sample_size, min_ucs, max_ucs,
-                    diameter, x_range, y_range, threshold
+                    diameter, x_range, y_range, threshold,height
                 )
     
     def _create_visualization(self):
@@ -146,22 +149,27 @@ class DistributionGenerator:
         return binom.ppf(random_probs, params['n'], params['p'])
     
     def _generate_distribution(self, dist_type, params, size, min_ucs, max_ucs,
-                             diameter, x_range, y_range, threshold):
+                             diameter, x_range, y_range, threshold,height):
         try:
             # Generate values
             values = self.dist_functions[dist_type](size, params)
             values = np.clip(values, min_ucs, max_ucs)
             
             # Calculate shaft resistance and skin friction
-            shaft_resistance = 0.141 * np.power(values/0.1, 0.5)
-            skin_friction = shaft_resistance * np.pi * ((diameter/2)**2)
+            shaft_resistance = 0.141 * np.power(values / 0.1, 0.5)
+            skin_friction = shaft_resistance * np.pi * ((diameter / 2) ** 2) * height
+
+            End_Bearing_capacity=4.66* np.power(values,0.56)
+
+            Total_Load=End_Bearing_capacity+skin_friction
+
             
             # Generate coordinates
             x_coords = np.random.uniform(0, x_range, size)
             y_coords = np.random.uniform(0, y_range, size)
             
             # Calculate failure percentage
-            failures = np.sum(skin_friction < threshold)
+            failures = np.sum(Total_Load < threshold)
             failure_percentage = (failures / len(skin_friction)) * 100
             
             # Create DataFrame
@@ -169,9 +177,10 @@ class DistributionGenerator:
                 'X (m)': x_coords,
                 'Y (m)': y_coords,
                 'UCS of Rock': values,
-                'Shaft Resistance': shaft_resistance,
+                'End_bearing_capacity':End_Bearing_capacity,
                 'Skin Friction': skin_friction,
-                'Below Threshold': skin_friction < threshold
+                'total_Load':Total_Load,
+                'Below Threshold': Total_Load< threshold
             })
             
             # Store analysis results
@@ -235,7 +244,7 @@ class DistributionGenerator:
     
     def _save_to_excel(self, dist_type):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"distribution_data_{timestamp}_{dist_type.lower().replace(' ', '_')}.xlsx"
+        filename = f"distribution_data_{timestamp}{dist_type.lower().replace(' ', '')}.xlsx"
         
         df = st.session_state.generated_data
         results = st.session_state.analysis_results
@@ -259,5 +268,5 @@ def main():
     app = DistributionGenerator()
     app.create_layout()
 
-if __name__ == "__main__":
+if __name__ == "_main_":
     main()
